@@ -88,7 +88,7 @@
 #define TEXTW(mon, text)        (drwl_font_getwidth(mon->drw, text) + mon->lrpad)
 
 /* enums */
-enum { SchemeNorm, SchemeSel, SchemeUrg }; /* color schemes */
+enum { SchemeNorm, SchemeSel, SchemeUrg, SchemeEmpty, SchemeStatus }; /* color schemes */
 enum { CurNormal, CurPressed, CurMove, CurResize }; /* cursor */
 enum { XDGShell, LayerShell, X11 }; /* client types */
 enum { LyrBg, LyrBottom, LyrTile, LyrFloat, LyrTop, LyrFS, LyrOverlay, LyrBlock, NUM_LAYERS }; /* scene layers */
@@ -365,8 +365,10 @@ static void setpsel(struct wl_listener *listener, void *data);
 static void setsel(struct wl_listener *listener, void *data);
 static void setup(void);
 static void spawn(const Arg *arg);
+static void drawstatus(Monitor *m, int *statusw);
 static void startdrag(struct wl_listener *listener, void *data);
 static int statusin(int fd, unsigned int mask, void *data);
+static int statuswidth(Monitor *m, const char *text);
 static void tag(const Arg *arg);
 static void tagmon(const Arg *arg);
 static void tile(Monitor *m);
@@ -390,6 +392,7 @@ static Monitor *xytomon(double x, double y);
 static void xytonode(double x, double y, struct wlr_surface **psurface,
 		Client **pc, LayerSurface **pl, double *nx, double *ny);
 static void zoom(const Arg *arg);
+static int hexcolor(const char *src, uint32_t *out);
 
 /* variables */
 static pid_t child_pid = -1;
@@ -1583,8 +1586,6 @@ void
 drawbar(Monitor *m)
 {
 	int x, w, tw = 0;
-	int boxs = m->drw->font->height / 9;
-	int boxw = m->drw->font->height / 6 + 2;
 	uint32_t i, occ = 0, urg = 0;
 	Client *c;
 	Buffer *buf;
@@ -1595,11 +1596,8 @@ drawbar(Monitor *m)
 		return;
 
 	/* draw status first so it can be overdrawn by tags later */
-	if (m == selmon) { /* status is only drawn on selected monitor */
-		drwl_setscheme(m->drw, colors[SchemeNorm]);
-		tw = TEXTW(m, stext) - m->lrpad + 2; /* 2px right padding */
-		drwl_text(m->drw, m->b.width - tw, 0, tw, m->b.height, 0, stext, 0);
-	}
+	if (m == selmon) /* status is only drawn on selected monitor */
+		drawstatus(m, &tw);
 
 	wl_list_for_each(c, &clients, link) {
 		if (c->mon != m)
@@ -1612,12 +1610,12 @@ drawbar(Monitor *m)
 	c = focustop(m);
 	for (i = 0; i < LENGTH(tags); i++) {
 		w = TEXTW(m, tags[i]);
-		drwl_setscheme(m->drw, colors[m->tagset[m->seltags] & 1 << i ? SchemeSel : SchemeNorm]);
+		drwl_setscheme(m->drw, colors[
+			m->tagset[m->seltags] & 1 << i ? SchemeSel :
+			urg & 1 << i ? SchemeUrg :
+			occ & 1 << i ? SchemeNorm : SchemeEmpty
+		]);
 		drwl_text(m->drw, x, 0, w, m->b.height, m->lrpad / 2, tags[i], urg & 1 << i);
-		if (occ & 1 << i)
-			drwl_rect(m->drw, x + boxs, boxs, boxw, boxw,
-				m == selmon && c && c->tags & 1 << i,
-				urg & 1 << i);
 		x += w;
 	}
 	w = TEXTW(m, m->ltsymbol);
@@ -1628,8 +1626,6 @@ drawbar(Monitor *m)
 		if (c) {
 			drwl_setscheme(m->drw, colors[m == selmon ? SchemeSel : SchemeNorm]);
 			drwl_text(m->drw, x, 0, w, m->b.height, m->lrpad / 2, client_get_title(c), 0);
-			if (c && c->isfloating)
-				drwl_rect(m->drw, x + boxs, boxs, boxw, boxw, 0, 0);
 		} else {
 			drwl_setscheme(m->drw, colors[SchemeNorm]);
 			drwl_rect(m->drw, x, 0, w, m->b.height, 1, 1);
@@ -1642,6 +1638,158 @@ drawbar(Monitor *m)
 		m->m.y + (topbar ? 0 : m->m.height - m->b.real_height));
 	wlr_scene_buffer_set_buffer(m->scene_buffer, &buf->base);
 	wlr_buffer_unlock(&buf->base);
+}
+
+void
+drawstatus(Monitor *m, int *statusw)
+{
+	char buf[256];
+	const char *p = stext;
+	int segw, tw, x, seglen, underline = 0, bold = 0;
+	uint32_t status_scheme[3], underline_scheme[3];
+
+	status_scheme[ColFg] = colors[SchemeStatus][ColFg];
+	status_scheme[ColBg] = colors[SchemeStatus][ColBg];
+	status_scheme[ColBorder] = colors[SchemeStatus][ColBorder];
+	underline_scheme[ColFg] = status_scheme[ColFg];
+	underline_scheme[ColBg] = status_scheme[ColBg];
+	underline_scheme[ColBorder] = status_scheme[ColBorder];
+
+	tw = statuswidth(m, stext) - m->lrpad + 2; /* 2px right padding */
+	x = m->b.width - tw;
+
+	while (*p) {
+		if (*p == '^') {
+			if (!strncmp(p, "^d^", 3)) {
+				status_scheme[ColFg] = colors[SchemeStatus][ColFg];
+				underline_scheme[ColFg] = status_scheme[ColFg];
+				underline = 0;
+				bold = 0;
+				p += 3;
+				continue;
+			}
+			if (!strncmp(p, "^B^", 3)) {
+				bold = !bold;
+				p += 3;
+				continue;
+			}
+			if (!strncmp(p, "^c", 2) && hexcolor(p + 2, &status_scheme[ColFg])) {
+				p += 9;
+				continue;
+			}
+			if (!strncmp(p, "^u", 2) && hexcolor(p + 2, &underline_scheme[ColFg])) {
+				underline = 1;
+				p += 9;
+				continue;
+			}
+			p++;
+			continue;
+		}
+
+		seglen = 0;
+		while (p[seglen] && p[seglen] != '^')
+			seglen++;
+		if (!seglen) {
+			p++;
+			continue;
+		}
+		if ((size_t)seglen >= sizeof(buf))
+			seglen = sizeof(buf) - 1;
+
+		memcpy(buf, p, seglen);
+		buf[seglen] = '\0';
+		segw = drwl_font_getwidth(m->drw, buf);
+
+		drwl_setscheme(m->drw, status_scheme);
+		drwl_text(m->drw, x, 0, segw, m->b.height, 0, buf, 0);
+		if (bold)
+			drwl_text(m->drw, x + 1, 0, segw, m->b.height, 0, buf, 0);
+		if (underline) {
+			drwl_setscheme(m->drw, underline_scheme);
+			drwl_rect(m->drw, x, m->b.height - 3, segw, 2, 1, 0);
+		}
+		x += segw;
+		p += seglen;
+	}
+
+	if (statusw)
+		*statusw = tw;
+}
+
+int
+statuswidth(Monitor *m, const char *text)
+{
+	char buf[256];
+	const char *p = text;
+	int width = 0, seglen, bold = 0;
+
+	while (*p) {
+		if (*p == '^') {
+			if (!strncmp(p, "^d^", 3)) {
+				bold = 0;
+				p += 3;
+				continue;
+			}
+			if (!strncmp(p, "^B^", 3)) {
+				bold = !bold;
+				p += 3;
+				continue;
+			}
+			if (!strncmp(p, "^c", 2) && hexcolor(p + 2, NULL)) {
+				p += 9;
+				continue;
+			}
+			if (!strncmp(p, "^u", 2) && hexcolor(p + 2, NULL)) {
+				p += 9;
+				continue;
+			}
+			p++;
+			continue;
+		}
+
+		seglen = 0;
+		while (p[seglen] && p[seglen] != '^')
+			seglen++;
+		if (!seglen) {
+			p++;
+			continue;
+		}
+		if ((size_t)seglen >= sizeof(buf))
+			seglen = sizeof(buf) - 1;
+
+		memcpy(buf, p, seglen);
+		buf[seglen] = '\0';
+		width += drwl_font_getwidth(m->drw, buf);
+		if (bold)
+			width += 1;
+		p += seglen;
+	}
+
+	return width + m->lrpad;
+}
+
+int
+hexcolor(const char *src, uint32_t *out)
+{
+	uint32_t color = 0;
+	int i, value;
+
+	for (i = 0; i < 6; i++) {
+		if (src[i] >= '0' && src[i] <= '9')
+			value = src[i] - '0';
+		else if (src[i] >= 'a' && src[i] <= 'f')
+			value = src[i] - 'a' + 10;
+		else if (src[i] >= 'A' && src[i] <= 'F')
+			value = src[i] - 'A' + 10;
+		else
+			return 0;
+		color = (color << 4) | (uint32_t)value;
+	}
+	if (src[6] != '^')
+		return 0;
+	if (out)
+		*out = (color << 8) | 0xff;
+	return 1;
 }
 
 void
