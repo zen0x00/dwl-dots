@@ -12,7 +12,7 @@ static const unsigned int gappx            = 10; /* gap pixel between windows */
 static const unsigned int borderpx         = 1;  /* border pixel of windows */
 static const int showbar                   = 1; /* 0 means no bar */
 static const int topbar                    = 1; /* 0 means bottom bar */
-static const char *fonts[]                 = {"JetBrainsMono Nerd Font Propo:size=16"};
+static const char *fonts[]                 = {"JetBrainsMono Nerd Font Propo:size=13"};
 static const float rootcolor[]             = COLOR(0x1e1e2eff);
 /* This conforms to the xdg-protocol. Set the alpha to zero to restore the old behavior */
 static const float fullscreen_bg[]         = {0.0f, 0.0f, 0.0f, 1.0f}; /* You can also use glsl colors */
@@ -131,6 +131,10 @@ static const char *termcmd[] = { "footclient", NULL };
 static const char *menucmd[] = { "fuzzel", NULL };
 static const char *browsercmd[] = { "firefox", NULL };
 static const char *filescmd[] = { "nautilus", NULL };
+static const char *editorcmd[] = { "code", NULL };
+static const char *wificmd[] = { "/bin/sh", "-c", "zen0x-launch-wifi", NULL };
+static const char *bluetoothcmd[] = { "/bin/sh", "-c", "zen0x-launch-bluetooth", NULL };
+static const char *audiocmd[] = { "/bin/sh", "-c", "zen0x-launch-audio", NULL };
 
 static const Key keys[] = {
 	/* Note that Shift changes certain key codes: 2 -> at, etc. */
@@ -139,6 +143,10 @@ static const Key keys[] = {
 	{ MODKEY,                    XKB_KEY_Return,      spawn,            {.v = termcmd} },
   { MODKEY,                    XKB_KEY_b,           spawn,            {.v = browsercmd} },
   { MODKEY,                    XKB_KEY_e,           spawn,            {.v = filescmd} },
+  { MODKEY|WLR_MODIFIER_SHIFT, XKB_KEY_c,           spawn,            {.v = editorcmd} },
+	{ MODKEY|WLR_MODIFIER_SHIFT, XKB_KEY_A,           spawn,            {.v = wificmd} },
+	{ MODKEY|WLR_MODIFIER_CTRL,  XKB_KEY_a,           spawn,            {.v = bluetoothcmd} },
+	{ MODKEY|WLR_MODIFIER_ALT,   XKB_KEY_a,           spawn,            {.v = audiocmd} },
 	{ MODKEY|WLR_MODIFIER_SHIFT, XKB_KEY_b,           togglebar,        {0} },
 	{ MODKEY,                    XKB_KEY_j,           focusstack,       {.i = +1} },
 	{ MODKEY,                    XKB_KEY_k,           focusstack,       {.i = -1} },

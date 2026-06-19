@@ -1,0 +1,1 @@
+../../../../../dotfiles/nvim/lua/config/lazy.lua

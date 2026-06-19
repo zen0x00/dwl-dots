@@ -1,0 +1,8 @@
+profile dual {
+    output HDMI-A-1 enable mode 1920x1080@179.960999Hz position 0,0
+    output eDP-1 disable
+}
+
+profile laptop {
+    output eDP-1 enable mode 1920x1080@144.003006Hz position 0,0 adaptive_sync on
+}

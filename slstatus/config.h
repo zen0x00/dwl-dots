@@ -67,9 +67,10 @@ static const char unknown_str[] = "n/a";
 
 static const struct arg args[] = {
     /* function format                 argument */
-    { battery_perc, "  ^uF9E2AF^^B^^cF9E2AF^BAT %s%%^d^  ", "BAT1" },
-    { disk_perc,    "^u89B4FA^^B^^c89B4FA^DISK %s%%^d^  ", "/" },
-    { ram_perc,     "^uF38BA8^^B^^cF38BA8^RAM %s%%^d^  ", NULL },
-    { cpu_perc,     "^uA6E3A1^^B^^cA6E3A1^CPU %s%%^d^  ", NULL },
-    { datetime,     "^uCBA6F7^^B^^cCBA6F7^%s^d^  ", "%a %I:%M %p" },
+    { run_command,  "^uF5C2E7^^B^^cF5C2E7^VOL: %s^d^ ", "wpctl get-volume @DEFAULT_AUDIO_SINK@ | awk '{printf \"%d%%\", $2 * 100}'" },
+    { wifi_essid,   "^u94E2D5^^B^^c94E2D5^WIFI: %s^d^ ", "wlan0" },
+    { battery_perc, "^uF9E2AF^^B^^cF9E2AF^BAT: %s%%^d^ ", "BAT1" },
+    { cpu_perc,     "^uA6E3A1^^B^^cA6E3A1^CPU: %s%%^d^ ", NULL },
+    { disk_perc,    "^u89B4FA^^B^^c89B4FA^DISK: %s%%^d^ ", "/" },
+    { datetime,     "^uCBA6F7^^B^^cCBA6F7^%s^d^", "%a %I:%M %p" },
 };

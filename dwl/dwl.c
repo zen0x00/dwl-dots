@@ -1643,9 +1643,11 @@ drawbar(Monitor *m)
 void
 drawstatus(Monitor *m, int *statusw)
 {
+	const int rightpad = 2;
+	const int segpad = 4;
 	char buf[256];
 	const char *p = stext;
-	int segw, tw, x, seglen, underline = 0, bold = 0;
+	int draww, segw, tw, x, seglen, underline = 0, bold = 0;
 	uint32_t status_scheme[3], underline_scheme[3];
 
 	status_scheme[ColFg] = colors[SchemeStatus][ColFg];
@@ -1655,7 +1657,7 @@ drawstatus(Monitor *m, int *statusw)
 	underline_scheme[ColBg] = status_scheme[ColBg];
 	underline_scheme[ColBorder] = status_scheme[ColBorder];
 
-	tw = statuswidth(m, stext) - m->lrpad + 2; /* 2px right padding */
+	tw = statuswidth(m, stext) - m->lrpad + rightpad;
 	x = m->b.width - tw;
 
 	while (*p) {
@@ -1699,16 +1701,17 @@ drawstatus(Monitor *m, int *statusw)
 		memcpy(buf, p, seglen);
 		buf[seglen] = '\0';
 		segw = drwl_font_getwidth(m->drw, buf);
+		draww = segw + segpad + (p[seglen] ? 0 : -segpad);
 
 		drwl_setscheme(m->drw, status_scheme);
-		drwl_text(m->drw, x, 0, segw, m->b.height, 0, buf, 0);
+		drwl_text(m->drw, x, 0, draww, m->b.height, 0, buf, 0);
 		if (bold)
-			drwl_text(m->drw, x + 1, 0, segw, m->b.height, 0, buf, 0);
+			drwl_text(m->drw, x + 1, 0, draww, m->b.height, 0, buf, 0);
 		if (underline) {
 			drwl_setscheme(m->drw, underline_scheme);
-			drwl_rect(m->drw, x, m->b.height - 3, segw, 2, 1, 0);
+			drwl_rect(m->drw, x, m->b.height - 3, draww, 2, 1, 0);
 		}
-		x += segw;
+		x += draww;
 		p += seglen;
 	}
 
@@ -1721,6 +1724,7 @@ statuswidth(Monitor *m, const char *text)
 {
 	char buf[256];
 	const char *p = text;
+	const int segpad = 4;
 	int width = 0, seglen, bold = 0;
 
 	while (*p) {
@@ -1759,7 +1763,7 @@ statuswidth(Monitor *m, const char *text)
 
 		memcpy(buf, p, seglen);
 		buf[seglen] = '\0';
-		width += drwl_font_getwidth(m->drw, buf);
+		width += drwl_font_getwidth(m->drw, buf) + (p[seglen] ? segpad : 0);
 		if (bold)
 			width += 1;
 		p += seglen;
